@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">Circus Eyes</string>
     <string name="capture">拍照</string>
+    <string name="bandwidth">请设置带宽</string>
+    <string name="choose">请选择设备</string>
 </resources>

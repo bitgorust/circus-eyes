@@ -35,4 +35,8 @@ dependencies {
     implementation project(':opencv')
     implementation project(':usbCameraCommon-release')
     implementation project(':libuvccamera-release')
+
+    implementation 'com.google.zxing:core:3.3.0'
+    implementation 'cn.bingoogolapple:bga-qrcodecore:1.1.9@aar'
+    implementation 'cn.bingoogolapple:bga-zxing:1.1.9@aar'
 }
