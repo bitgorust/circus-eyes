@@ -1,5 +1,6 @@
 package sh.diqi.circuseyes;
 
+import android.content.Intent;
 import android.graphics.SurfaceTexture;
 import android.hardware.usb.UsbDevice;
 import android.os.Bundle;
@@ -211,6 +212,13 @@ public class MainActivity extends BaseActivity implements CameraDialog.CameraDia
 
         mQRCodeView = findViewById(R.id.zxingview);
         mQRCodeView.setDelegate(this);
+
+        findViewById(R.id.detect).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(MainActivity.this, FrameActivity.class));
+            }
+        });
     }
 
     private void stopPreview(int index) {
