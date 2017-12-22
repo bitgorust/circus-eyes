@@ -18,12 +18,13 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility javaSourceCompatibility
+        targetCompatibility javaTargetCompatibility
     }
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
+            jni.srcDirs = []
         }
     }
     buildTypes {
@@ -57,11 +58,11 @@ dependencies {
         exclude module: 'recyclerview-v7'
     }
     //    implementation project(':opencv')
-    implementation project(':usbCameraCommon-release')
-    implementation project(':libuvccamera-release')
     implementation 'com.google.zxing:core:3.3.0'
     implementation 'cn.bingoogolapple:bga-qrcodecore:1.1.9@aar'
     implementation 'cn.bingoogolapple:bga-zxing:1.1.9@aar'
     implementation 'org.tensorflow:tensorflow-android:1.4.0'
     implementation project(':openCVLibrary331')
+    implementation project(':usbCameraCommon')
+    implementation project(':libuvccamera')
 }

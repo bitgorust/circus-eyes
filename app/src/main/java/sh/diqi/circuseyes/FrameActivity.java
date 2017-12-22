@@ -16,8 +16,21 @@ import com.serenegiant.usb.USBMonitor;
 import com.serenegiant.usb.UVCCamera;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 public class FrameActivity extends BaseActivity implements CameraDialog.CameraDialogParent {
 
@@ -48,10 +61,76 @@ public class FrameActivity extends BaseActivity implements CameraDialog.CameraDi
             frame.clear();
             synchronized (bitmap) {
                 bitmap.copyPixelsFromBuffer(frame);
+
+                Mat image = new Mat();
+                Utils.bitmapToMat(bitmap, image);
+                Imgproc.cvtColor(image, image, Imgproc.COLOR_BGR2HSV);
+                Mat mask = new Mat();
+                Core.inRange(image, new Scalar(35, 43, 46), new Scalar(99, 255, 255), mask);
+                Imgproc.threshold(mask, mask, 128, 255, 1);
+                Mat kernel = Imgproc.getStructuringElement(Imgproc.CV_SHAPE_ELLIPSE, new Size(8, 3));
+                Imgproc.dilate(mask, mask, kernel, new Point(), 2);
+                List<MatOfPoint> contours = new ArrayList<>();
+                Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+                if (contours.size() == 0) {
+                    return;
+                }
+
+                Collections.sort(contours, new Comparator<MatOfPoint>() {
+                    @Override
+                    public int compare(MatOfPoint c1, MatOfPoint c2) {
+                        double a1 = Imgproc.contourArea(c1);
+                        double a2 = Imgproc.contourArea(c2);
+                        return a2 > a1 ? 1 : (a2 == a1 ? 0 : -1);
+                    }
+                });
+                List<Rect> boxes = new ArrayList<>();
+                for (MatOfPoint contour : contours) {
+                    Rect rect = Imgproc.boundingRect(contour);
+                    rect = new Rect(rect.x - 100 > 0 ? rect.x - 100 : 0, rect.y - 100 > 0 ? rect.y - 100 : 0,
+                            rect.width + 200 < image.width() ? rect.width + 200 : image.width(), rect.height + 200 < image.height() ? rect.height + 200 : image.height());
+                    boolean matched = false;
+                    for (int i = 0; i < boxes.size(); i++) {
+                        Rect box = boxes.get(i);
+                        if (isInside(rect, box)) {
+                            boxes.set(i, new Rect(box.x < rect.x ? box.x : rect.x, box.y < rect.y ? box.y : rect.y,
+                                    box.width > rect.width ? box.width : rect.width, box.height > rect.height ? box.height : rect.height));
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched) {
+                        boxes.add(rect);
+                    }
+                }
+                if (boxes.size() == 0) {
+                    return;
+                }
+
+                contours.clear();
+                for (Rect box : boxes) {
+                    contours.add(new MatOfPoint(new Point(box.x, box.y), new Point(box.x + box.width, box.y),
+                            new Point(box.x + box.width, box.y + box.height), new Point(box.x, box.y + box.height)));
+                }
+                for (MatOfPoint contour : contours) {
+                    Rect rect = Imgproc.boundingRect(contour);
+                    Imgproc.rectangle(image, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height),
+                            new Scalar(255, 0, 0), 2);
+                }
+                Utils.matToBitmap(image, bitmap);
             }
             preview.post(mUpdateImageTask);
         }
     };
+
+    private boolean isInside(Rect a, Rect b) {
+        if (a.x >= b.x && a.x <= b.x + b.width && a.x + a.width >= b.x && a.x + a.width <= b.x + b.width && a.y >= b.y && a.y <= b.y + b.height && a.y + a.height >= b.y && a.y + a.height <= b.y + b.height) {
+            return true;
+        }
+        int aCenterX = a.x + a.width / 2;
+        int aCenterY = a.y + a.height / 2;
+        return aCenterX >= b.x && aCenterX <= b.x + b.width && aCenterY >= b.y && aCenterY <= b.y + b.height;
+    }
 
     private final USBMonitor.OnDeviceConnectListener onDeviceConnectListener = new USBMonitor.OnDeviceConnectListener() {
 
