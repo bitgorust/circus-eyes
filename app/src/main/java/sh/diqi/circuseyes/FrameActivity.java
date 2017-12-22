@@ -3,6 +3,7 @@ package sh.diqi.circuseyes;
 import android.graphics.Bitmap;
 import android.hardware.usb.UsbDevice;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
@@ -62,6 +63,7 @@ public class FrameActivity extends BaseActivity implements CameraDialog.CameraDi
             synchronized (bitmap) {
                 bitmap.copyPixelsFromBuffer(frame);
 
+                long start = System.currentTimeMillis();
                 Mat image = new Mat();
                 Utils.bitmapToMat(bitmap, image);
                 Imgproc.cvtColor(image, image, Imgproc.COLOR_BGR2HSV);
@@ -118,6 +120,7 @@ public class FrameActivity extends BaseActivity implements CameraDialog.CameraDi
                             new Scalar(255, 0, 0), 2);
                 }
                 Utils.matToBitmap(image, bitmap);
+                Log.d(getPackageName(), (System.currentTimeMillis() - start) / 1000 + " ms needed to split preview.");
             }
             preview.post(mUpdateImageTask);
         }
