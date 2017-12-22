@@ -15,9 +15,15 @@ import com.serenegiant.usb.IFrameCallback;
 import com.serenegiant.usb.USBMonitor;
 import com.serenegiant.usb.UVCCamera;
 
+import org.opencv.android.OpenCVLoader;
+
 import java.nio.ByteBuffer;
 
 public class FrameActivity extends BaseActivity implements CameraDialog.CameraDialogParent {
+
+    static {
+        OpenCVLoader.initDebug();
+    }
 
     private USBMonitor usbMonitor;
 

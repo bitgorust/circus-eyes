@@ -31,9 +31,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".FrameActivity" />
-        <activity
-            android:name=".DetectActivity"
-            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

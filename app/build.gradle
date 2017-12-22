@@ -10,6 +10,21 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++11", "-frtti", "-fexceptions"
+                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+            }
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
     }
     buildTypes {
         release {
@@ -17,26 +32,36 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+    retrolambda {
+        javaVersion JavaVersion.VERSION_1_7
+        jvmArgs '-arg1', '-arg2'
+    }
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "com.android.support:appcompat-v7:$supportLibVersion"
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.1'
     androidTestImplementation('com.android.support.test.espresso:espresso-core:3.0.1', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
-
-    implementation("com.serenegiant:common:${commonLibVersion}") {
+    implementation "com.android.support:support-annotations:$supportLibVersion"
+    implementation("com.serenegiant:common:$commonLibVersion") {
         exclude module: 'support-v4'
         exclude module: 'recyclerview-v7'
     }
-    implementation project(':opencv')
+    //    implementation project(':opencv')
     implementation project(':usbCameraCommon-release')
     implementation project(':libuvccamera-release')
-
     implementation 'com.google.zxing:core:3.3.0'
     implementation 'cn.bingoogolapple:bga-qrcodecore:1.1.9@aar'
     implementation 'cn.bingoogolapple:bga-zxing:1.1.9@aar'
+    implementation 'org.tensorflow:tensorflow-android:1.4.0'
+    implementation project(':openCVLibrary331')
 }
