@@ -18,6 +18,7 @@
     android:layout_height="match_parent">
 
     <LinearLayout
+        android:id="@+id/preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal">
@@ -26,16 +27,22 @@
             android:id="@+id/texture"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"/>
+            android:layout_weight="1" />
 
         <ImageView
             android:id="@+id/result"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@color/RED"/>
+            android:layout_weight="1" />
 
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/detected"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"
+        android:layout_above="@id/control"
+        android:textColor="@color/WHITE" />
 
     <FrameLayout
         android:id="@+id/control"

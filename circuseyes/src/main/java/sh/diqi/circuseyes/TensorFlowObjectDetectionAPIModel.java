@@ -19,6 +19,7 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
 import android.os.Trace;
+import android.util.Log;
 
 import org.tensorflow.Graph;
 import org.tensorflow.Operation;
@@ -138,6 +139,7 @@ public class TensorFlowObjectDetectionAPIModel implements Classifier {
     Trace.beginSection("preprocessBitmap");
     // Preprocess the image data from 0-255 int to normalized float based
     // on the provided parameters.
+    Log.d(getClass().getSimpleName(), intValues.length + " =? " + bitmap.getWidth() + " * " + bitmap.getHeight());
     bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
 
     for (int i = 0; i < intValues.length; ++i) {
@@ -193,7 +195,7 @@ public class TensorFlowObjectDetectionAPIModel implements Classifier {
           new Recognition("" + i, labels.get((int) outputClasses[i]), outputScores[i], detection));
     }
 
-    final ArrayList<Recognition> recognitions = new ArrayList<Recognition>();
+    final ArrayList<Recognition> recognitions = new ArrayList<>();
     for (int i = 0; i < Math.min(pq.size(), MAX_RESULTS); ++i) {
       recognitions.add(pq.poll());
     }

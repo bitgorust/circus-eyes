@@ -46,6 +46,7 @@ import android.media.ImageReader;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
@@ -63,8 +64,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.w3c.dom.Text;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -77,6 +76,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import sh.diqi.circuseyes.Classifier;
 import sh.diqi.circuseyes.FMCGDetector;
 
 public class Camera2BasicFragment extends Fragment
@@ -169,6 +169,9 @@ public class Camera2BasicFragment extends Fragment
 
     };
 
+    private static final String SSD_MOBILENET_MODEL_FILE = "file:///android_asset/fmcg_frozen.pb";
+    private static final String SSD_MOBILENET_LABELS_FILE = "file:///android_asset/fmcg_labels.txt";
+
     /**
      * ID of the current {@link CameraDevice}.
      */
@@ -180,6 +183,8 @@ public class Camera2BasicFragment extends Fragment
     private AutoFitTextureView mTextureView;
 
     private ImageView mResultView;
+
+    private TextView mDetectedText;
 
     private FMCGDetector mDetector;
 
@@ -261,7 +266,7 @@ public class Camera2BasicFragment extends Fragment
         @Override
         public void onImageAvailable(ImageReader reader) {
 //            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));
-            mBackgroundHandler.post(new ImageParser(reader.acquireNextImage(), mDetector, mResultView));
+            mBackgroundHandler.post(new ImageParser(reader.acquireNextImage(), mDetector, mResultView, mDetectedText));
         }
 
     };
@@ -448,6 +453,7 @@ public class Camera2BasicFragment extends Fragment
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = view.findViewById(R.id.texture);
         mResultView = view.findViewById(R.id.result);
+        mDetectedText = view.findViewById(R.id.detected);
     }
 
     @Override
@@ -741,7 +747,10 @@ public class Camera2BasicFragment extends Fragment
 
                             if (null == mDetector) {
                                 try {
-                                    mDetector = new FMCGDetector(getActivity().getAssets(), mPreviewSize.getWidth(), mPreviewSize.getHeight(), FMCGDetector.BG.GREEN);
+                                    mDetector = new FMCGDetector(getActivity(),
+                                            SSD_MOBILENET_MODEL_FILE, SSD_MOBILENET_LABELS_FILE,
+                                            MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT,
+                                            FMCGDetector.BG.GREEN);
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
@@ -990,25 +999,50 @@ public class Camera2BasicFragment extends Fragment
         private final Image mImage;
         private final FMCGDetector mDetector;
         private final ImageView mResultView;
+        private final TextView mTextView;
 
-        ImageParser(Image image, FMCGDetector detector, ImageView imageView) {
+        ImageParser(Image image, FMCGDetector detector, ImageView imageView, TextView textView) {
             mImage = image;
             mDetector = detector;
             mResultView = imageView;
+            mTextView = textView;
         }
 
 
         @Override
         public void run() {
+            final long startTime = SystemClock.uptimeMillis();
             ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
             final byte[] data = new byte[buffer.capacity()];
             buffer.get(data);
             final Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-            final Bitmap result = mDetector.analyze(bitmap);
+            final List<RectF> rois = mDetector.getRois(bitmap, FMCGDetector.BG.GREEN);
+            final List<Classifier.Recognition> results = mDetector.recognize(bitmap, rois);
+//            final List<Classifier.Recognition> results = mDetector.recognize(bitmap);
+            final List<RectF> locations = new ArrayList<>();
+            final StringBuffer sb = new StringBuffer();
+            for (Classifier.Recognition result : results) {
+                Log.d(TAG, result.getId() + ":" + result.getTitle() + ":" + result.getConfidence());
+                sb.append(result.getId());
+                sb.append(":");
+                sb.append(result.getTitle());
+                sb.append(":");
+                sb.append(result.getConfidence());
+                sb.append("\t");
+                if (result.getId().equals("-")) {
+                    sb.append("\n");
+                }
+                locations.add(result.getLocation());
+            }
+            Log.d(TAG, (SystemClock.uptimeMillis() - startTime) + " millis taken to parse image.");
             mResultView.post(new Runnable() {
                 @Override
                 public void run() {
-                    mResultView.setImageBitmap(result);
+                   Bitmap result = mDetector.drawRects(bitmap, locations, 0, 0, 255);
+                    Matrix matrix = new Matrix();
+                    matrix.postRotate(90);
+                    mResultView.setImageBitmap(Bitmap.createBitmap(result, 0, 0, result.getWidth(), result.getHeight(), matrix, true));
+                    mTextView.setText(sb.toString());
                 }
             });
         }

@@ -47,7 +47,7 @@ import com.serenegiant.utils.PermissionCheck;
 public class BaseActivity extends Activity
 	implements MessageDialogFragment.MessageDialogListener {
 
-	private static boolean DEBUG = true;	// FIXME 実働時はfalseにセットすること
+	private static boolean DEBUG = false;	// FIXME 実働時はfalseにセットすること
 	private static final String TAG = BaseActivity.class.getSimpleName();
 
 	/** UI操作のためのHandler */

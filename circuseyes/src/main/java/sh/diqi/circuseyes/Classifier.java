@@ -19,6 +19,7 @@ import android.graphics.Bitmap;
 import android.graphics.RectF;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Generic interface for interacting with different recognition engines.
@@ -87,7 +88,7 @@ public interface Classifier {
       }
 
       if (confidence != null) {
-        resultString += String.format("(%.1f%%) ", confidence * 100.0f);
+        resultString += String.format(Locale.CHINESE, "(%.1f%%) ", confidence * 100.0f);
       }
 
       if (location != null) {

@@ -33,7 +33,7 @@ import android.util.Log;
 import android.view.Surface;
 
 public class MediaSurfaceEncoder extends MediaEncoder implements IVideoEncoder {
-	private static final boolean DEBUG = true;	// TODO set false on release
+	private static final boolean DEBUG = false;	// TODO set false on release
 	private static final String TAG = "MediaSurfaceEncoder";
 
 	private static final String MIME_TYPE = "video/avc";
