@@ -18,10 +18,28 @@
     android:layout_height="match_parent">
 
     <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <ImageView
+            android:id="@+id/image"
+            android:layout_width="640dp"
+            android:layout_height="480dp" />
+
+        <ImageView
+            android:id="@+id/result"
+            android:layout_width="640dp"
+            android:layout_height="480dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:visibility="gone">
 
         <sh.diqi.circustest.AutoFitTextureView
             android:id="@+id/texture"
@@ -29,20 +47,22 @@
             android:layout_height="wrap_content"
             android:layout_weight="1" />
 
-        <ImageView
-            android:id="@+id/result"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+        <!--<ImageView-->
+        <!--android:id="@+id/result"-->
+        <!--android:layout_width="0dp"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:layout_weight="1" />-->
 
     </LinearLayout>
 
     <TextView
         android:id="@+id/detected"
         android:layout_width="match_parent"
-        android:layout_height="250dp"
+        android:layout_height="match_parent"
         android:layout_above="@id/control"
-        android:textColor="@color/WHITE" />
+        android:scrollbars="vertical"
+        android:textColor="@color/WHITE"
+        android:textSize="30dp" />
 
     <FrameLayout
         android:id="@+id/control"
@@ -50,7 +70,8 @@
         android:layout_height="112dp"
         android:layout_alignParentBottom="true"
         android:layout_alignParentStart="true"
-        android:background="@color/control_background">
+        android:background="@color/control_background"
+        android:visibility="gone">
 
         <Button
             android:id="@+id/picture"

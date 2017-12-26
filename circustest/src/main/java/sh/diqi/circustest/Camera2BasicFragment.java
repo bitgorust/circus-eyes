@@ -31,6 +31,7 @@ import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
+import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -52,6 +53,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -67,6 +69,7 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -136,6 +139,8 @@ public class Camera2BasicFragment extends Fragment
      */
     private static final int MAX_PREVIEW_HEIGHT = 1080;
 
+    private static final FMCGDetector.BG BG_COLOR = FMCGDetector.BG.GREEN;
+
     /**
      * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
      * {@link TextureView}.
@@ -181,6 +186,8 @@ public class Camera2BasicFragment extends Fragment
      * An {@link AutoFitTextureView} for camera preview.
      */
     private AutoFitTextureView mTextureView;
+
+    private ImageView mImageView;
 
     private ImageView mResultView;
 
@@ -235,6 +242,8 @@ public class Camera2BasicFragment extends Fragment
         }
 
     };
+
+    String imageFile = "IMG_20171226_191409.jpg";
 
     /**
      * An additional thread for running tasks that shouldn't block the UI.
@@ -405,7 +414,7 @@ public class Camera2BasicFragment extends Fragment
      * @return The optimal {@code Size}, or an arbitrary one if none were big enough
      */
     private static Size chooseOptimalSize(Size[] choices, int textureViewWidth,
-            int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
+                                          int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
 
         // Collect the supported resolutions that are at least as big as the preview Surface
         List<Size> bigEnough = new ArrayList<>();
@@ -417,7 +426,7 @@ public class Camera2BasicFragment extends Fragment
             if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
                     option.getHeight() == option.getWidth() * h / w) {
                 if (option.getWidth() >= textureViewWidth &&
-                    option.getHeight() >= textureViewHeight) {
+                        option.getHeight() >= textureViewHeight) {
                     bigEnough.add(option);
                 } else {
                     notBigEnough.add(option);
@@ -454,6 +463,26 @@ public class Camera2BasicFragment extends Fragment
         mTextureView = view.findViewById(R.id.texture);
         mResultView = view.findViewById(R.id.result);
         mDetectedText = view.findViewById(R.id.detected);
+        mDetectedText.setMovementMethod(new ScrollingMovementMethod());
+        mImageView = view.findViewById(R.id.image);
+
+        if (null == mDetector) {
+            try {
+                mDetector = new FMCGDetector(getActivity(),
+                        SSD_MOBILENET_MODEL_FILE, SSD_MOBILENET_LABELS_FILE,
+                        MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT,
+                        FMCGDetector.BG.GREEN);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        try {
+            InputStream is = getActivity().getAssets().open(imageFile);
+            mImageView.setImageDrawable(Drawable.createFromStream(is, null));
+        } catch (IOException e) {
+            Log.d(TAG, e.toString());
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -682,6 +711,13 @@ public class Camera2BasicFragment extends Fragment
         mBackgroundThread = new HandlerThread("CameraBackground");
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+        try {
+            InputStream is = getActivity().getAssets().open(imageFile);
+            Bitmap bm = BitmapFactory.decodeStream(is);
+            mBackgroundHandler.post(new ImageParser(bm, mDetector, mResultView, mDetectedText));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -750,7 +786,7 @@ public class Camera2BasicFragment extends Fragment
                                     mDetector = new FMCGDetector(getActivity(),
                                             SSD_MOBILENET_MODEL_FILE, SSD_MOBILENET_LABELS_FILE,
                                             MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT,
-                                            FMCGDetector.BG.GREEN);
+                                            BG_COLOR);
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
@@ -996,13 +1032,23 @@ public class Camera2BasicFragment extends Fragment
     }
 
     private static class ImageParser implements Runnable {
-        private final Image mImage;
+        private final Bitmap mBitmap;
         private final FMCGDetector mDetector;
         private final ImageView mResultView;
         private final TextView mTextView;
 
         ImageParser(Image image, FMCGDetector detector, ImageView imageView, TextView textView) {
-            mImage = image;
+            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+            final byte[] data = new byte[buffer.capacity()];
+            buffer.get(data);
+            mBitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+            mDetector = detector;
+            mResultView = imageView;
+            mTextView = textView;
+        }
+
+        ImageParser(Bitmap bitmap, FMCGDetector detector, ImageView imageView, TextView textView) {
+            mBitmap = bitmap;
             mDetector = detector;
             mResultView = imageView;
             mTextView = textView;
@@ -1012,24 +1058,23 @@ public class Camera2BasicFragment extends Fragment
         @Override
         public void run() {
             final long startTime = SystemClock.uptimeMillis();
-            ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
-            final byte[] data = new byte[buffer.capacity()];
-            buffer.get(data);
-            final Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-            final List<RectF> rois = mDetector.getRois(bitmap, FMCGDetector.BG.GREEN);
-            final List<Classifier.Recognition> results = mDetector.recognize(bitmap, rois);
+            final List<RectF> rois = mDetector.getRois(mBitmap, BG_COLOR);
+            final List<Classifier.Recognition> results = mDetector.recognize(mBitmap, rois);
 //            final List<Classifier.Recognition> results = mDetector.recognize(bitmap);
             final List<RectF> locations = new ArrayList<>();
             final StringBuffer sb = new StringBuffer();
             for (Classifier.Recognition result : results) {
-                Log.d(TAG, result.getId() + ":" + result.getTitle() + ":" + result.getConfidence());
-                sb.append(result.getId());
-                sb.append(":");
-                sb.append(result.getTitle());
-                sb.append(":");
-                sb.append(result.getConfidence());
-                sb.append("\t");
-                if (result.getId().equals("-")) {
+//                Log.d(TAG, result.getId() + ":" + result.getTitle() + ":" + result.getConfidence());
+                if (result.getId().equals("r")) {
+                    sb.append("\n");
+                    sb.append(result.getLocation().toShortString());
+                    sb.append("\n");
+                } else {
+                    sb.append(result.getId());
+                    sb.append(":");
+                    sb.append(result.getTitle());
+                    sb.append(":");
+                    sb.append(result.getConfidence());
                     sb.append("\n");
                 }
                 locations.add(result.getLocation());
@@ -1038,7 +1083,8 @@ public class Camera2BasicFragment extends Fragment
             mResultView.post(new Runnable() {
                 @Override
                 public void run() {
-                   Bitmap result = mDetector.drawRects(bitmap, locations, 0, 0, 255);
+                    Bitmap result = mDetector.drawRects(mBitmap, locations, 0, 0, 255);
+                    result = mDetector.drawRects(result, rois, 255, 0, 0);
                     Matrix matrix = new Matrix();
                     matrix.postRotate(90);
                     mResultView.setImageBitmap(Bitmap.createBitmap(result, 0, 0, result.getWidth(), result.getHeight(), matrix, true));

@@ -69,10 +69,12 @@ public class FMCGDetector {
     private static final int THRESHOLD_TYPE = 1;
     private static final double KERNEL_WIDTH = 8;
     private static final double KERNEL_HEIGHT = 3;
-    private static final int DILATE_SIZE = 512;
+    private static final int DILATE_SIZE = 256;
     private static final int DILATE_ITERATIONS = 2;
     private static final float MINIMUM_CONFIDENCE = 0.1f;
     private static final float MINIMUM_ROI_AREA = 2048;
+    private static final float MAXIMUM_ROI_AREA = 2048 * 1536;
+    private static final int MINIMUM_ROI_NUM = 3;
 
     private Context mContext;
     private Classifier mDetector;
@@ -250,8 +252,31 @@ public class FMCGDetector {
         for (RectF box : boxes) {
             if (box.width() * box.height() > MINIMUM_ROI_AREA) {
                 rois.add(box);
+                if (box.width() * box.height() > MAXIMUM_ROI_AREA) {
+                    float halfWidth = (float) Math.floor(box.width() / 2d);
+                    float halfHeight = (float) Math.floor(box.height() / 2d);
+                    for (float left = 0; left + halfWidth <= box.width(); left += halfWidth) {
+                        rois.add(new RectF(box.left + left, box.top, box.left + left + halfWidth, box.bottom));
+                    }
+                    for (float top = 0; top + halfHeight <= box.height(); top += halfHeight) {
+                        rois.add(new RectF(box.left, box.top + top, box.right, box.top + top + halfHeight));
+                    }
+                    for (float left = 0; left + halfWidth <= box.width(); left += halfWidth) {
+                        for (float top = 0; top + halfHeight <= box.height(); top += halfHeight) {
+                            rois.add(new RectF(box.left + left, box.top + top, box.left + left + halfWidth, box.top + top + halfHeight));
+                        }
+                    }
+//                    float atomSize = (float) Math.min(Math.floor(origin.width() / 3d), Math.floor(origin.height() / 3d));
+//                    float atomStep = (float) Math.floor(atomSize / 2f);
+//                    for (float left = 0; left < origin.width(); left += atomStep) {
+//                        for (float top = 0; top < origin.height(); top += atomStep) {
+//                            rois.add(new RectF(left, top, Math.min(left + atomSize, origin.width()), Math.min(top + atomSize, origin.height())));
+//                        }
+//                    }
+                }
             }
         }
+
         long spent = System.currentTimeMillis() - start;
         Log.d(TAG, spent + " ms taken to get rects.");
 
@@ -259,9 +284,9 @@ public class FMCGDetector {
             String dirName = md5(bitmap) + "_" + MINIMUM_ROI_AREA;
             File dir = new File(mContext.getExternalFilesDir(null), dirName);
             if (dir.exists() || dir.mkdirs()) {
-                for (RectF box : boxes) {
+                for (RectF box : rois) {
                     saveFile(Bitmap.createBitmap(bitmap, Math.round(box.left), Math.round(box.top), Math.round(box.width()), Math.round(box.height())),
-                            dirName, "roi_" + spent + "ms_" + box.toShortString() + "_" + (box.width() * box.height()) + ".jpg");
+                            dirName, "roi_" + spent + "ms_b" + rois.size() + "_" + box.toShortString() + "_" + box.width() + "×" + box.height() + ".jpg");
                 }
             }
         }
@@ -292,13 +317,11 @@ public class FMCGDetector {
             }
         }
         Log.d(TAG, (SystemClock.uptimeMillis() - startTime) + " ms taken to recognize bitmap.");
-        cropped.recycle();
         return results;
     }
 
     public List<Classifier.Recognition> recognize(Bitmap origin, RectF roi) {
         final long startTime = SystemClock.uptimeMillis();
-
         Bitmap bitmap = Bitmap.createBitmap(origin, Math.round(roi.left), Math.round(roi.top), Math.round(roi.width()), Math.round(roi.height()));
         final List<Classifier.Recognition> results = recognize(bitmap);
         long spent = SystemClock.uptimeMillis() - startTime;
@@ -315,7 +338,7 @@ public class FMCGDetector {
                     Imgproc.rectangle(mat, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(255, 0, 0), 2);
                 }
                 Utils.matToBitmap(mat, bitmap);
-                saveFile(bitmap, dirName, "rec_" + spent + "ms_" + roi.toShortString() + "_" + (roi.width() * roi.height()) + ".jpg");
+                saveFile(bitmap, dirName, "rec_" + spent + "ms_" + roi.toShortString() + "_" + roi.width() + "×" + roi.height() + ".jpg");
             }
         }
 
@@ -326,7 +349,6 @@ public class FMCGDetector {
             result.setLocation(location);
             results.set(i, result);
         }
-        bitmap.recycle();
         return results;
     }
 
@@ -337,7 +359,7 @@ public class FMCGDetector {
         final long startTime = SystemClock.uptimeMillis();
         final List<Classifier.Recognition> results = new ArrayList<>();
         for (RectF roi : rois) {
-            results.add(new Classifier.Recognition("-", "split", 1f, roi));
+            results.add(new Classifier.Recognition("r", "roi", 1f, roi));
             results.addAll(recognize(origin, roi));
         }
         Log.d(TAG, (SystemClock.uptimeMillis() - startTime) + " millis taken to recognize bitmap.");
@@ -357,11 +379,9 @@ public class FMCGDetector {
     private Pair<Scalar, Scalar> getBounding(final BG color) {
         switch (color) {
             case BLACK:
-                return new Pair<>(new Scalar(0, 0, 0), new Scalar(180, 255, 46));
-            case GRAY:
-                return new Pair<>(new Scalar(0, 0, 46), new Scalar(180, 43, 220));
+                return new Pair<>(new Scalar(0, 0, 0), new Scalar(180, 255, 220));
             case WHITE:
-                return new Pair<>(new Scalar(0, 0, 221), new Scalar(180, 30, 255));
+                return new Pair<>(new Scalar(0, 0, 46), new Scalar(180, 43, 255));
             case BLUE:
                 return new Pair<>(new Scalar(100, 43, 46), new Scalar(124, 255, 255));
             case RED:
@@ -387,7 +407,7 @@ public class FMCGDetector {
         byte[] bitmapBytes = baos.toByteArray();
         try {
             MessageDigest m = MessageDigest.getInstance("MD5");
-            m.update(bitmapBytes,0,bitmapBytes.length);
+            m.update(bitmapBytes, 0, bitmapBytes.length);
             return new BigInteger(1, m.digest()).toString(16);
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -400,7 +420,6 @@ public class FMCGDetector {
         try {
             out = new FileOutputStream(new File(mContext.getExternalFilesDir(dir), file));
             bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out);
-            bitmap.recycle();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -415,7 +434,7 @@ public class FMCGDetector {
     }
 
     private int getScreenOrientation(Context context) {
-        switch (((Activity)context).getWindowManager().getDefaultDisplay().getRotation()) {
+        switch (((Activity) context).getWindowManager().getDefaultDisplay().getRotation()) {
             case Surface.ROTATION_270:
                 return 270;
             case Surface.ROTATION_180:
