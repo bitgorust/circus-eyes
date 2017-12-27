@@ -42,4 +42,5 @@ dependencies {
         exclude module: 'recyclerview-v7'
     }
     implementation project(':circuseyes')
+    compile project(path: ':openCVLibrary331')
 }

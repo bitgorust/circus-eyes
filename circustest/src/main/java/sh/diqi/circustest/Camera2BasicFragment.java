@@ -243,7 +243,7 @@ public class Camera2BasicFragment extends Fragment
 
     };
 
-    String imageFile = "IMG_20171226_191409.jpg";
+    String imageFile = "IMG_20171226_191422.jpg";
 
     /**
      * An additional thread for running tasks that shouldn't block the UI.
@@ -1059,16 +1059,20 @@ public class Camera2BasicFragment extends Fragment
         public void run() {
             final long startTime = SystemClock.uptimeMillis();
             final List<RectF> rois = mDetector.getRois(mBitmap, BG_COLOR);
-            final List<Classifier.Recognition> results = mDetector.recognize(mBitmap, rois);
 //            final List<Classifier.Recognition> results = mDetector.recognize(bitmap);
+            List<Classifier.Recognition> results = mDetector.recognize(mBitmap, rois);
             final List<RectF> locations = new ArrayList<>();
             final StringBuffer sb = new StringBuffer();
+            int count = 0;
             for (Classifier.Recognition result : results) {
-//                Log.d(TAG, result.getId() + ":" + result.getTitle() + ":" + result.getConfidence());
                 if (result.getId().equals("r")) {
+                    if (count > 2) {
+                        break;
+                    }
                     sb.append("\n");
                     sb.append(result.getLocation().toShortString());
                     sb.append("\n");
+                    count++;
                 } else {
                     sb.append(result.getId());
                     sb.append(":");
@@ -1079,15 +1083,29 @@ public class Camera2BasicFragment extends Fragment
                 }
                 locations.add(result.getLocation());
             }
+
+//            results = mDetector.merge(results);
+//            sb.append("\nsummary\n");
+//            for (Classifier.Recognition result : results) {
+//                sb.append(result.getId());
+//                sb.append(":");
+//                sb.append(result.getTitle());
+//                sb.append(":");
+//                sb.append(result.getConfidence());
+//                sb.append("\n");
+//                locations.add(result.getLocation());
+//            }
+
             Log.d(TAG, (SystemClock.uptimeMillis() - startTime) + " millis taken to parse image.");
             mResultView.post(new Runnable() {
                 @Override
                 public void run() {
                     Bitmap result = mDetector.drawRects(mBitmap, locations, 0, 0, 255);
                     result = mDetector.drawRects(result, rois, 255, 0, 0);
-                    Matrix matrix = new Matrix();
-                    matrix.postRotate(90);
-                    mResultView.setImageBitmap(Bitmap.createBitmap(result, 0, 0, result.getWidth(), result.getHeight(), matrix, true));
+                    mResultView.setImageBitmap(result);
+//                    Matrix matrix = new Matrix();
+//                    matrix.postRotate(90);
+//                    mResultView.setImageBitmap(Bitmap.createBitmap(result, 0, 0, result.getWidth(), result.getHeight(), matrix, true));
                     mTextView.setText(sb.toString());
                 }
             });

@@ -320,6 +320,46 @@ public class FMCGDetector {
         return results;
     }
 
+    public List<Classifier.Recognition> merge(List<Classifier.Recognition> candidates) {
+        List<Classifier.Recognition> chosen = new ArrayList<>();
+        Collections.sort(candidates, new Comparator<Classifier.Recognition>() {
+            @Override
+            public int compare(Classifier.Recognition r1, Classifier.Recognition r2) {
+                return r2.getConfidence() > r1.getConfidence() ? 1 : (r2.getConfidence().equals(r1.getConfidence()) ? 0 : -1);
+            }
+        });
+        for (Classifier.Recognition candidate : candidates) {
+            if (candidate.getId().equals("r")) {
+                continue;
+            }
+            Classifier.Recognition matched = null;
+            for (int i = 0; i < chosen.size(); i++) {
+                Classifier.Recognition object = chosen.get(i);
+                if (object.getLocation().contains(candidate.getLocation()) &&
+                        object.getId().equals(candidate.getId())) {
+                    matched = object;
+                    break;
+                }
+                if (object.getLocation().intersect(candidate.getLocation()) &&
+                        object.getLocation().contains(candidate.getLocation().centerX(), candidate.getLocation().centerY()) &&
+                        object.getId().equals(candidate.getId())) {
+                    object.setLocation(new RectF(
+                            Math.min(object.getLocation().left, candidate.getLocation().left),
+                            Math.min(object.getLocation().top, candidate.getLocation().top),
+                            Math.max(object.getLocation().right, candidate.getLocation().right),
+                            Math.max(object.getLocation().bottom, candidate.getLocation().bottom)
+                    ));
+                    matched = object;
+                    break;
+                }
+            }
+            if (matched == null) {
+                chosen.add(candidate);
+            }
+        }
+        return chosen;
+    }
+
     public List<Classifier.Recognition> recognize(Bitmap origin, RectF roi) {
         final long startTime = SystemClock.uptimeMillis();
         Bitmap bitmap = Bitmap.createBitmap(origin, Math.round(roi.left), Math.round(roi.top), Math.round(roi.width()), Math.round(roi.height()));
