@@ -2,6 +2,7 @@ package sh.diqi.circuseyes;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
@@ -14,18 +15,26 @@ import android.view.Surface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
+import org.opencv.core.DMatch;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfDMatch;
+import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.features2d.BFMatcher;
+import org.opencv.features2d.DescriptorExtractor;
+import org.opencv.features2d.FeatureDetector;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -33,7 +42,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created by zengjing on 2017/12/23.
@@ -89,6 +100,19 @@ public class FMCGDetector {
 
     private DetectCallback mDetectCallback;
 
+    private FeatureDetector mFeatureDetector;
+    private DescriptorExtractor mDescriptorExtractor;
+    private BFMatcher mBFMatcher;
+    private Map<String, List<Map<String, Object>>> mFeatureIndex;
+
+    public FMCGDetector(final Context context, final String candidatesDir) throws IOException {
+        mContext = context;
+        mFeatureDetector = FeatureDetector.create(FeatureDetector.BRISK);
+        mDescriptorExtractor = DescriptorExtractor.create(DescriptorExtractor.BRISK);
+        mBFMatcher = BFMatcher.create(Core.NORM_HAMMING, false);
+        buildFeatureIndex(candidatesDir);
+    }
+
     public FMCGDetector(final Context context, final String modelFile, final String labelFile, final int width, final int height, final BG color) throws IOException {
         mContext = context;
         mImageWidth = width;
@@ -108,78 +132,89 @@ public class FMCGDetector {
         mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
     }
 
-    public void analyze(final ByteBuffer byteBuffer) {
-
-    }
-
-    public void analyze(final ByteBuffer byteBuffer, final DetectCallback callback) throws NullPointerException {
-        if (callback == null) {
-            throw new NullPointerException("callback should not be null");
+    private void buildFeatureIndex(String candidatesDir) throws IOException {
+        mFeatureIndex = new HashMap<>();
+        String dirPath = candidatesDir.split("file:///android_asset/")[1];
+        AssetManager assetManager = mContext.getAssets();
+        for (String file : assetManager.list(dirPath)) {
+            String filePath = dirPath + "/" + file;
+            Log.d(TAG, filePath);
+            File cacheFile = new File(mContext.getCacheDir() + "/" + file);
+            try {
+                InputStream is = mContext.getAssets().open(filePath);
+                int size = is.available();
+                byte[] buffer = new byte[size];
+                is.read(buffer);
+                is.close();
+                FileOutputStream fos = new FileOutputStream(cacheFile);
+                fos.write(buffer);
+                fos.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            String name = file.split("_")[0];
+            Mat img = Imgcodecs.imread(cacheFile.getAbsolutePath(), Imgcodecs.IMREAD_GRAYSCALE);
+//            Imgproc.resize(img, img, new Size(), 0.8, 0.8, Imgproc.INTER_AREA);
+            Log.d(TAG, cacheFile.getAbsolutePath() + ": " + img.size().toString());
+            MatOfKeyPoint kp = new MatOfKeyPoint();
+            mFeatureDetector.detect(img, kp);
+            Log.d(TAG, "kp: " + kp.size().toString());
+            Mat des = new Mat();
+            mDescriptorExtractor.compute(img, kp, des);
+            Log.d(TAG, "des: " + des.size().toString());
+            if (!mFeatureIndex.containsKey(name)) {
+                mFeatureIndex.put(name, new ArrayList<Map<String, Object>>());
+            }
+            Map<String, Object> feature = new HashMap<>();
+            feature.put("kp", kp);
+            feature.put("des", des);
+            feature.put("img", img);
+            mFeatureIndex.get(name).add(feature);
         }
-        Bitmap bitmap = Bitmap.createBitmap(mImageWidth, mImageHeight, Bitmap.Config.RGB_565);
-//        byteBuffer.clear();
-        bitmap.copyPixelsFromBuffer(byteBuffer);
-        bitmap = analyze(bitmap);
-        bitmap.copyPixelsToBuffer(byteBuffer);
-        callback.onFrame(byteBuffer);
-        bitmap.recycle();
     }
 
-    public synchronized Bitmap analyze(Bitmap bitmap) {
-        long start = System.currentTimeMillis();
+    public List<String> analyze(Bitmap bitmap) {
+        List<String> results = new ArrayList<>();
+        final long startTime = SystemClock.uptimeMillis();
         Mat origin = new Mat();
         Utils.bitmapToMat(bitmap, origin);
-        Mat image = new Mat();
-        Imgproc.cvtColor(origin, image, Imgproc.COLOR_BGR2HSV);
-        Mat mask = new Mat();
-        Pair<Scalar, Scalar> bounding = getBounding(mImageBgColor);
-        Core.inRange(image, bounding.first, bounding.second, mask);
-        Imgproc.threshold(mask, mask, THRESHOLD_THRESH, THRESHOLD_MAXVAL, THRESHOLD_TYPE);
-        Mat kernel = Imgproc.getStructuringElement(Imgproc.CV_SHAPE_ELLIPSE, new Size(KERNEL_WIDTH, KERNEL_HEIGHT));
-        Imgproc.dilate(mask, mask, kernel, new Point(), DILATE_ITERATIONS);
-        List<MatOfPoint> contours = new ArrayList<>();
-        Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-        Collections.sort(contours, new Comparator<MatOfPoint>() {
-            @Override
-            public int compare(MatOfPoint c1, MatOfPoint c2) {
-                double a1 = Imgproc.contourArea(c1);
-                double a2 = Imgproc.contourArea(c2);
-                return a2 > a1 ? 1 : (a2 == a1 ? 0 : -1);
-            }
-        });
-
-        List<Rect> boxes = new ArrayList<>();
-        for (MatOfPoint contour : contours) {
-            Rect rect = Imgproc.boundingRect(contour);
-            rect = new Rect(rect.x - 100 > 0 ? rect.x - 100 : 0, rect.y - 100 > 0 ? rect.y - 100 : 0,
-                    rect.width + 200 < image.width() ? rect.width + 200 : image.width(), rect.height + 200 < image.height() ? rect.height + 200 : image.height());
+        Mat img = new Mat();
+        Imgproc.cvtColor(origin, img, Imgproc.COLOR_BGR2GRAY);
+//        Imgproc.resize(img, img, new Size(), 0.6, 0.6, Imgproc.INTER_AREA);
+        MatOfKeyPoint kp = new MatOfKeyPoint();
+        mFeatureDetector.detect(img, kp);
+        Mat des = new Mat();
+        mDescriptorExtractor.compute(img, kp, des);
+        for (Map.Entry<String, List<Map<String, Object>>> entry: mFeatureIndex.entrySet()) {
+            String name = entry.getKey();
+            List<Map<String, Object>> faces = entry.getValue();
+//            Log.d(TAG, name + ": " + faces.size());
             boolean matched = false;
-            for (int i = 0; i < boxes.size(); i++) {
-                Rect box = boxes.get(i);
-                if (isInside(rect, box)) {
-                    boxes.set(i, new Rect(box.x < rect.x ? box.x : rect.x, box.y < rect.y ? box.y : rect.y,
-                            box.width > rect.width ? box.width : rect.width, box.height > rect.height ? box.height : rect.height));
+            StringBuilder score = new StringBuilder();
+            for (Map<String, Object> face : faces) {
+                List<MatOfDMatch> matches = new ArrayList<>();
+                mBFMatcher.knnMatch((Mat)face.get("des"), des, matches, 2);
+                int good = 0;
+                for (MatOfDMatch match : matches) {
+                    List<DMatch> dMatches = match.toList();
+                    if (dMatches.size() >= 2 && dMatches.get(0).distance < 0.75 * dMatches.get(1).distance) {
+                        good++;
+                    }
+                }
+//                Log.d(TAG, "matches: " + matches.size() + ", good: " + good);
+                if (good > 5) {
                     matched = true;
+                    score.append(good).append(", ");
                     break;
                 }
             }
-            if (!matched) {
-                boxes.add(rect);
+            if (matched) {
+                results.add(name + ": " + score.toString());
             }
         }
-        contours.clear();
-        for (Rect box : boxes) {
-            contours.add(new MatOfPoint(new Point(box.x, box.y), new Point(box.x + box.width, box.y),
-                    new Point(box.x + box.width, box.y + box.height), new Point(box.x, box.y + box.height)));
-        }
-        for (MatOfPoint contour : contours) {
-            Rect rect = Imgproc.boundingRect(contour);
-            Imgproc.rectangle(origin, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height),
-                    new Scalar(255, 0, 0), 2);
-        }
-        Utils.matToBitmap(origin, bitmap);
-        Log.d(TAG, (System.currentTimeMillis() - start) + " millis taken.");
-        return bitmap;
+        long spent = SystemClock.uptimeMillis() - startTime;
+//        Log.d(TAG, spent + " ms taken to analyze.");
+        return results;
     }
 
     public Bitmap drawRects(Bitmap bitmap, List<RectF> rects, int red, int green, int blue) {

@@ -23,6 +23,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -45,6 +46,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
+import android.os.Debug;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
@@ -65,6 +67,16 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfKeyPoint;
+import org.opencv.core.Scalar;
+import org.opencv.features2d.DescriptorExtractor;
+import org.opencv.features2d.FeatureDetector;
+import org.opencv.features2d.Features2d;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -174,7 +186,7 @@ public class Camera2BasicFragment extends Fragment
 
     };
 
-    private static final String SSD_MOBILENET_MODEL_FILE = "file:///android_asset/fmcg_frozen.pb";
+    private static final String SSD_MOBILENET_MODEL_FILE = "file:///android_asset/frozen_inference_graph.pb";
     private static final String SSD_MOBILENET_LABELS_FILE = "file:///android_asset/fmcg_labels.txt";
 
     /**
@@ -243,7 +255,7 @@ public class Camera2BasicFragment extends Fragment
 
     };
 
-    String imageFile = "IMG_20171226_191422.jpg";
+    private static final String imageFile = "test/IMG_3666.JPG";
 
     /**
      * An additional thread for running tasks that shouldn't block the UI.
@@ -468,10 +480,11 @@ public class Camera2BasicFragment extends Fragment
 
         if (null == mDetector) {
             try {
-                mDetector = new FMCGDetector(getActivity(),
-                        SSD_MOBILENET_MODEL_FILE, SSD_MOBILENET_LABELS_FILE,
-                        MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT,
-                        FMCGDetector.BG.GREEN);
+                mDetector = new FMCGDetector(getActivity(), "file:///android_asset/candidates");
+//                mDetector = new FMCGDetector(getActivity(),
+//                        SSD_MOBILENET_MODEL_FILE, SSD_MOBILENET_LABELS_FILE,
+//                        MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT,
+//                        FMCGDetector.BG.GREEN);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -1057,33 +1070,56 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void run() {
-            final long startTime = SystemClock.uptimeMillis();
-            final List<RectF> rois = mDetector.getRois(mBitmap, BG_COLOR);
-//            final List<Classifier.Recognition> results = mDetector.recognize(bitmap);
-            List<Classifier.Recognition> results = mDetector.recognize(mBitmap, rois);
-            final List<RectF> locations = new ArrayList<>();
-            final StringBuffer sb = new StringBuffer();
-            int count = 0;
-            for (Classifier.Recognition result : results) {
-                if (result.getId().equals("r")) {
-                    if (count > 2) {
-                        break;
-                    }
-                    sb.append("\n");
-                    sb.append(result.getLocation().toShortString());
-                    sb.append("\n");
-                    count++;
-                } else {
-                    sb.append(result.getId());
-                    sb.append(":");
-                    sb.append(result.getTitle());
-                    sb.append(":");
-                    sb.append(result.getConfidence());
-                    sb.append("\n");
-                }
-                locations.add(result.getLocation());
-            }
+//            String filePath = "candidates/102377_1.jpg";
+//            Mat img = Imgcodecs.imread(filePath, Imgcodecs.IMREAD_GRAYSCALE);
+//            Log.d(TAG, img.height() + " * " + img.width());
+//            MatOfKeyPoint kp = new MatOfKeyPoint();
+//            FeatureDetector detector = FeatureDetector.create(FeatureDetector.BRISK);
+//            detector.detect(img, kp);
+//            Mat des = new Mat();
+//            DescriptorExtractor extractor = DescriptorExtractor.create(DescriptorExtractor.BRISK);
+//            extractor.compute(img, kp, des);
+//            Features2d.drawKeypoints(img, kp, img, new Scalar(0, 255, 0), 0);
+//            Utils.matToBitmap(img, mBitmap);
 
+            final long startTime = SystemClock.uptimeMillis();
+            final List<String> results = mDetector.analyze(mBitmap);
+            long spent = SystemClock.uptimeMillis() - startTime;
+            Log.d(TAG, spent + " millis taken to parse image.");
+            final StringBuffer sb = new StringBuffer();
+            for (String result : results) {
+                sb.append(result);
+                sb.append("\n");
+            }
+            sb.append(spent);
+            sb.append(" ms");
+
+//            final List<RectF> rois = mDetector.getRois(mBitmap, BG_COLOR);
+//            final List<Classifier.Recognition> results = mDetector.recognize(bitmap);
+//            List<Classifier.Recognition> results = mDetector.recognize(mBitmap, rois);
+//            final List<RectF> locations = new ArrayList<>();
+//            final StringBuffer sb = new StringBuffer();
+//            int count = 0;
+//            for (Classifier.Recognition result : results) {
+//                if (result.getId().equals("r")) {
+//                    if (count > 2) {
+//                        break;
+//                    }
+//                    sb.append("\n");
+//                    sb.append(result.getLocation().toShortString());
+//                    sb.append("\n");
+//                    count++;
+//                } else {
+//                    sb.append(result.getId());
+//                    sb.append(":");
+//                    sb.append(result.getTitle());
+//                    sb.append(":");
+//                    sb.append(result.getConfidence());
+//                    sb.append("\n");
+//                }
+//                locations.add(result.getLocation());
+//            }
+//
 //            results = mDetector.merge(results);
 //            sb.append("\nsummary\n");
 //            for (Classifier.Recognition result : results) {
@@ -1095,14 +1131,13 @@ public class Camera2BasicFragment extends Fragment
 //                sb.append("\n");
 //                locations.add(result.getLocation());
 //            }
-
-            Log.d(TAG, (SystemClock.uptimeMillis() - startTime) + " millis taken to parse image.");
             mResultView.post(new Runnable() {
                 @Override
                 public void run() {
-                    Bitmap result = mDetector.drawRects(mBitmap, locations, 0, 0, 255);
-                    result = mDetector.drawRects(result, rois, 255, 0, 0);
-                    mResultView.setImageBitmap(result);
+//                    mResultView.setImageBitmap(mBitmap);
+//                    Bitmap result = mDetector.drawRects(mBitmap, locations, 0, 0, 255);
+//                    result = mDetector.drawRects(result, rois, 255, 0, 0);
+//                    mResultView.setImageBitmap(result);
 //                    Matrix matrix = new Matrix();
 //                    matrix.postRotate(90);
 //                    mResultView.setImageBitmap(Bitmap.createBitmap(result, 0, 0, result.getWidth(), result.getHeight(), matrix, true));
