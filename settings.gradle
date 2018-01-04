@@ -1,1 +1,1 @@
-include ':circuseyes', ':openCVLibrary331', ':libuvccamera', ':usbCameraCommon', ':circustest'
+include ':circuseyes', ':openCVLibrary331', ':circustest'

@@ -21,13 +21,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:ignore="GoogleAppIndexingWarning">
-        <activity
-            android:name=".MainActivity"
-            android:screenOrientation="landscape">
-
-        </activity>
-        <activity android:name=".FrameActivity" >
-        </activity>
     </application>
 
 </manifest>

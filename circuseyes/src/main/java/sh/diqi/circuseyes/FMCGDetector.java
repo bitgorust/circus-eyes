@@ -231,53 +231,53 @@ public class FMCGDetector {
         long start = System.currentTimeMillis();
         Mat origin = new Mat();
         Utils.bitmapToMat(bitmap, origin);
-        Mat image = new Mat();
-        Imgproc.cvtColor(origin, image, Imgproc.COLOR_BGR2HSV);
-        Mat mask = new Mat();
-        Pair<Scalar, Scalar> bounding = getBounding(color);
-        Core.inRange(image, bounding.first, bounding.second, mask);
-        Imgproc.threshold(mask, mask, THRESHOLD_THRESH, THRESHOLD_MAXVAL, THRESHOLD_TYPE);
-        Mat kernel = Imgproc.getStructuringElement(Imgproc.CV_SHAPE_ELLIPSE, new Size(KERNEL_WIDTH, KERNEL_HEIGHT));
-        Imgproc.dilate(mask, mask, kernel, new Point(), DILATE_ITERATIONS);
-        List<MatOfPoint> contours = new ArrayList<>();
-        Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-        Collections.sort(contours, new Comparator<MatOfPoint>() {
-            @Override
-            public int compare(MatOfPoint c1, MatOfPoint c2) {
-                double a1 = Imgproc.contourArea(c1);
-                double a2 = Imgproc.contourArea(c2);
-                return a2 > a1 ? 1 : (a2 == a1 ? 0 : -1);
-            }
-        });
+//        Mat image = new Mat();
+//        Imgproc.cvtColor(origin, image, Imgproc.COLOR_BGR2HSV);
+//        Mat mask = new Mat();
+//        Pair<Scalar, Scalar> bounding = getBounding(color);
+//        Core.inRange(image, bounding.first, bounding.second, mask);
+//        Imgproc.threshold(mask, mask, THRESHOLD_THRESH, THRESHOLD_MAXVAL, THRESHOLD_TYPE);
+//        Mat kernel = Imgproc.getStructuringElement(Imgproc.CV_SHAPE_ELLIPSE, new Size(KERNEL_WIDTH, KERNEL_HEIGHT));
+//        Imgproc.dilate(mask, mask, kernel, new Point(), DILATE_ITERATIONS);
+//        List<MatOfPoint> contours = new ArrayList<>();
+//        Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+//        Collections.sort(contours, new Comparator<MatOfPoint>() {
+//            @Override
+//            public int compare(MatOfPoint c1, MatOfPoint c2) {
+//                double a1 = Imgproc.contourArea(c1);
+//                double a2 = Imgproc.contourArea(c2);
+//                return a2 > a1 ? 1 : (a2 == a1 ? 0 : -1);
+//            }
+//        });
 
         List<RectF> boxes = new ArrayList<>();
-        for (MatOfPoint contour : contours) {
-            Rect rect = Imgproc.boundingRect(contour);
-            RectF dilated = new RectF(Math.max(rect.x - DILATE_SIZE, 0),
-                    Math.max(rect.y - DILATE_SIZE, 0),
-                    Math.min(rect.x + rect.width + DILATE_SIZE, origin.width()),
-                    Math.min(rect.y + rect.height + DILATE_SIZE, origin.height()));
-            boolean matched = false;
-            for (int i = 0; i < boxes.size(); i++) {
-                RectF box = boxes.get(i);
-                if (box.contains(dilated)) {
-                    matched = true;
-                    break;
-                }
-                if (box.contains(dilated.centerX(), dilated.centerY())) {
-                    box.set(Math.min(box.left, dilated.left),
-                            Math.min(box.top, dilated.top),
-                            Math.max(box.right, dilated.right),
-                            Math.max(box.bottom, dilated.bottom));
-                    boxes.set(i, box);
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched) {
-                boxes.add(new RectF(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height));
-            }
-        }
+//        for (MatOfPoint contour : contours) {
+//            Rect rect = Imgproc.boundingRect(contour);
+//            RectF dilated = new RectF(Math.max(rect.x - DILATE_SIZE, 0),
+//                    Math.max(rect.y - DILATE_SIZE, 0),
+//                    Math.min(rect.x + rect.width + DILATE_SIZE, origin.width()),
+//                    Math.min(rect.y + rect.height + DILATE_SIZE, origin.height()));
+//            boolean matched = false;
+//            for (int i = 0; i < boxes.size(); i++) {
+//                RectF box = boxes.get(i);
+//                if (box.contains(dilated)) {
+//                    matched = true;
+//                    break;
+//                }
+//                if (box.contains(dilated.centerX(), dilated.centerY())) {
+//                    box.set(Math.min(box.left, dilated.left),
+//                            Math.min(box.top, dilated.top),
+//                            Math.max(box.right, dilated.right),
+//                            Math.max(box.bottom, dilated.bottom));
+//                    boxes.set(i, box);
+//                    matched = true;
+//                    break;
+//                }
+//            }
+//            if (!matched) {
+//                boxes.add(new RectF(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height));
+//            }
+//        }
 
         if (boxes.size() == 0) {
             boxes = Collections.singletonList(new RectF(0, 0, origin.width(), origin.height()));
@@ -287,28 +287,28 @@ public class FMCGDetector {
         for (RectF box : boxes) {
             if (box.width() * box.height() > MINIMUM_ROI_AREA) {
                 rois.add(box);
-                if (box.width() * box.height() > MAXIMUM_ROI_AREA) {
-                    float halfWidth = (float) Math.floor(box.width() / 2d);
-                    float halfHeight = (float) Math.floor(box.height() / 2d);
-                    for (float left = 0; left + halfWidth <= box.width(); left += halfWidth) {
-                        rois.add(new RectF(box.left + left, box.top, box.left + left + halfWidth, box.bottom));
-                    }
-                    for (float top = 0; top + halfHeight <= box.height(); top += halfHeight) {
-                        rois.add(new RectF(box.left, box.top + top, box.right, box.top + top + halfHeight));
-                    }
-                    for (float left = 0; left + halfWidth <= box.width(); left += halfWidth) {
-                        for (float top = 0; top + halfHeight <= box.height(); top += halfHeight) {
-                            rois.add(new RectF(box.left + left, box.top + top, box.left + left + halfWidth, box.top + top + halfHeight));
-                        }
-                    }
-//                    float atomSize = (float) Math.min(Math.floor(origin.width() / 3d), Math.floor(origin.height() / 3d));
-//                    float atomStep = (float) Math.floor(atomSize / 2f);
-//                    for (float left = 0; left < origin.width(); left += atomStep) {
-//                        for (float top = 0; top < origin.height(); top += atomStep) {
-//                            rois.add(new RectF(left, top, Math.min(left + atomSize, origin.width()), Math.min(top + atomSize, origin.height())));
+//                if (box.width() * box.height() > MAXIMUM_ROI_AREA) {
+//                    float halfWidth = (float) Math.floor(box.width() / 2d);
+//                    float halfHeight = (float) Math.floor(box.height() / 2d);
+//                    for (float left = 0; left + halfWidth <= box.width(); left += halfWidth) {
+//                        rois.add(new RectF(box.left + left, box.top, box.left + left + halfWidth, box.bottom));
+//                    }
+//                    for (float top = 0; top + halfHeight <= box.height(); top += halfHeight) {
+//                        rois.add(new RectF(box.left, box.top + top, box.right, box.top + top + halfHeight));
+//                    }
+//                    for (float left = 0; left + halfWidth <= box.width(); left += halfWidth) {
+//                        for (float top = 0; top + halfHeight <= box.height(); top += halfHeight) {
+//                            rois.add(new RectF(box.left + left, box.top + top, box.left + left + halfWidth, box.top + top + halfHeight));
 //                        }
 //                    }
-                }
+////                    float atomSize = (float) Math.min(Math.floor(origin.width() / 3d), Math.floor(origin.height() / 3d));
+////                    float atomStep = (float) Math.floor(atomSize / 2f);
+////                    for (float left = 0; left < origin.width(); left += atomStep) {
+////                        for (float top = 0; top < origin.height(); top += atomStep) {
+////                            rois.add(new RectF(left, top, Math.min(left + atomSize, origin.width()), Math.min(top + atomSize, origin.height())));
+////                        }
+////                    }
+//                }
             }
         }
 
@@ -326,7 +326,7 @@ public class FMCGDetector {
             }
         }
 
-        boxes.clear();
+//        boxes.clear();
         return rois;
     }
 

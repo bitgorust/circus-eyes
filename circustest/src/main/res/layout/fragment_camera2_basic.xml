@@ -62,7 +62,7 @@
         android:layout_marginTop="500dp"
         android:layout_above="@id/control"
         android:scrollbars="vertical"
-        android:textColor="@color/WHITE"
+        android:textColor="#ffffff"
         android:textSize="30dp" />
 
     <FrameLayout
