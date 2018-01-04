@@ -1073,9 +1073,9 @@ public class Camera2BasicFragment extends Fragment
 //            sb.append(" ms");
 
             final long startTime = SystemClock.uptimeMillis();
-            final List<RectF> rois = mDetector.getRois(mBitmap, BG_COLOR);
+//            final List<RectF> rois = mDetector.getRois(mBitmap, BG_COLOR);
 //            final List<Classifier.Recognition> results = mDetector.recognize(bitmap);
-            List<Classifier.Recognition> results = mDetector.recognize(mBitmap, rois);
+            List<Classifier.Recognition> results = mDetector.recognize(mBitmap, BG_COLOR);
             final long spent = SystemClock.uptimeMillis() - startTime;
             final List<RectF> locations = new ArrayList<>();
             final StringBuffer sb = new StringBuffer();
@@ -1118,7 +1118,7 @@ public class Camera2BasicFragment extends Fragment
                 public void run() {
                     mResultView.setImageBitmap(mBitmap);
                     Bitmap result = mDetector.drawRects(mBitmap, locations, 0, 0, 255);
-                    result = mDetector.drawRects(result, rois, 255, 0, 0);
+//                    result = mDetector.drawRects(result, rois, 255, 0, 0);
                     mResultView.setImageBitmap(result);
 //                    Matrix matrix = new Matrix();
 //                    matrix.postRotate(90);
