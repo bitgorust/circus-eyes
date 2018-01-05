@@ -119,7 +119,7 @@ public class FMCGDetector {
         mImageHeight = height;
         mImageBgColor = color;
         mSensorOrientation = 90 - getScreenOrientation(context);
-        mInputSize = Math.max(width, height);
+//        mInputSize = Math.max(width, height);
         mDetector = TensorFlowObjectDetectionAPIModel.create(context.getAssets(), modelFile, labelFile, mInputSize);
     }
 
@@ -398,7 +398,15 @@ public class FMCGDetector {
     public List<Classifier.Recognition> recognize(Bitmap origin, RectF roi) {
         final long startTime = SystemClock.uptimeMillis();
         Bitmap bitmap = Bitmap.createBitmap(origin, Math.round(roi.left), Math.round(roi.top), Math.round(roi.width()), Math.round(roi.height()));
-        final List<Classifier.Recognition> results = recognize(bitmap);
+        Bitmap cropped = Bitmap.createBitmap(mInputSize, mInputSize, Bitmap.Config.RGB_565);
+        Matrix frameToCropTransform =
+                getTransformationMatrix(
+                        origin.getWidth(), origin.getHeight(),
+                        mInputSize, mInputSize,
+                        mSensorOrientation, false);
+        Canvas canvas = new Canvas(cropped);
+        canvas.drawBitmap(origin, frameToCropTransform, null);
+        final List<Classifier.Recognition> results = recognize(cropped);
         long spent = SystemClock.uptimeMillis() - startTime;
         Log.d(TAG, spent + " ms taken to analyze roi.");
 

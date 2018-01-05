@@ -23,7 +23,6 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
-import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -46,7 +45,6 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
-import android.os.Debug;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
@@ -179,7 +177,7 @@ public class Camera2BasicFragment extends Fragment
     private static final String SSD_MOBILENET_MODEL_FILE = "file:///android_asset/fmcg_frozen.pb";
     private static final String SSD_MOBILENET_LABELS_FILE = "file:///android_asset/fmcg_labels.txt";
 
-    private static final String imageFile = "test/IMG_3666.JPG";
+    private static final String imageFile = "test/IMG_20171220_111153.jpg";
 
     /**
      * ID of the current {@link CameraDevice}.
